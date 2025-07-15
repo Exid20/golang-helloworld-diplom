@@ -26,7 +26,7 @@ jobs:
         run: docker build -t golang-helloworld:${{ github.sha }} .    # Собрать docker-образ
 
       - name: Save artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: golang-helloworld
           path: main                      # загрузить исполняемый файл Go, если он сгенерирован именно как main
