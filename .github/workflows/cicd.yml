@@ -55,6 +55,6 @@ jobs:
 Ветка: ${GITHUB_REF}\n\
 Commit: ${GITHUB_SHA}\n\
 Время: $(date '+%Y-%m-%d %H:%M:%S')"
-  curl -s -X POST "https://api.telegram.org/bot8109888607:AAHK7Pd-irbxl9sVvYeBXAWVu3lC_Ibxg-s/sendMessage" \
+          curl -s -X POST "https://api.telegram.org/bot8109888607:AAHK7Pd-irbxl9sVvYeBXAWVu3lC_Ibxg-s/sendMessage" \
             -d chat_id="${CHAT_ID}" \
             -d text="$message"
