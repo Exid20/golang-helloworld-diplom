@@ -44,7 +44,10 @@ jobs:
 
       - name: Telegram notify
         env:
-          BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          curl -s -X POST "https://api.telegram.org/bot${8109888607:AAHK7Pd-irbxl9sVvYeBXAWVu3lC_Ibxg-s}/sendMessage?chat_id=${CHAT_ID}&text=Deploy%20complete"
+          BOT_TOKEN: ${{ secrets.8109888607:AAHK7Pd-irbxl9sVvYeBXAWVu3lC_Ibxg-s }}
+          CHAT_ID: ${{ secrets.1837682902 }}
+        run:
+         message="✅ Деплой завершён успешно $(date '+%Y-%m-%d %H:%M:%S')"
+        curl -s -X POST "https://api.telegram.org/bot8109888607:AAHK7Pd-irbxl9sVvYeBXAWVu3lC_Ibxg-s/sendMessage" \
+          -d chat_id="${CHAT_ID}" \
+          -d text="$message"
