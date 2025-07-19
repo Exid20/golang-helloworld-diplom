@@ -49,8 +49,8 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-            run: |
-  message="🏁 CI завершён для ${GITHUB_REPOSITORY}\n\
+        run: |
+          message="🏁 CI завершён для ${GITHUB_REPOSITORY}\n\
 Статус deploy: ${{ job.status }}\n\
 Ветка: ${GITHUB_REF}\n\
 Commit: ${GITHUB_SHA}\n\
