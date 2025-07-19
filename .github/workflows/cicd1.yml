@@ -1,0 +1,50 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ "*" ]        # Запускается при пуше в любую ветку
+  pull_request:              # И при каждом pull request
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3          # Клонировать твой репозиторий
+      
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'               # Твоя версия Go (можно '1.21' или другая)
+
+      - name: Run Linter
+        run: go fmt ./...                  # Прогнать автоформатирование (быстро, это базово)
+
+      - name: Run Tests
+        run: go test -v ./...              # Запустить все тесты (если их нет — не страшно)
+
+      - name: Build Docker image
+        run: docker build -t golang-helloworld:${{ github.sha }} .    # Собрать docker-образ
+
+      - name: Save artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: golang-helloworld
+          path: main                      # загрузить исполняемый файл Go, если он сгенерирован именно как main
+
+  # Можно добавить этап деплоя
+  deploy:
+    if: github.ref == 'refs/heads/main'    # Только если пуш в main
+    needs: build-test                      # Запускать только после успешной сборки и тестов
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy step (example)
+        run: echo "Deploy step - тут ваша команда развёртывания"
+
+      - name: Telegram notify
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot8109888607:AAHK7Pd-irbxl9sVvYeBXAWVu3lC_Ibxg-s/sendMessage?chat_id=1837682902&text=Deploy%20complete"
