@@ -14,7 +14,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.20'               # Твоя версия Go (можно '1.21' или другая)
+          go-version: '1.21'               # Твоя версия Go (можно '1.21' или другая)
 
       - name: Run Linter
         run: go fmt ./...                  # Прогнать автоформатирование (быстро, это базово)
