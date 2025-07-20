@@ -49,11 +49,12 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          message=" CI завершён для ${GITHUB_REPOSITORY}\nСтатус deploy: ${{ job.status }}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
-            else
+        run: | 
+          if [ "${{ job.status }}" == "success" ]; then 
+            message=" CI завершён для ${GITHUB_REPOSITORY}\nСтатус deploy: ${{ job.status }}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
+          else
             message="CI завершился с ошибкой для ${GITHUB_REPOSITORY}\nСтатус deploy: ${{ job.status }}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
-              fi
+          fi
           curl -s -X POST "https://api.telegram.org/bot8109888607:AAHK7Pd-irbxl9sVvYeBXAWVu3lC_Ibxg-s/sendMessage" \
             -d chat_id="${CHAT_ID}" \
             -d text="$message"
