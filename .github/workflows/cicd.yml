@@ -41,8 +41,22 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Deploy step (example)
-        run: echo "Deploy step - тут ваша команда развертывания"
+      - name: Deploy to Yandex Cloud VM
+        env:
+          VM_IP: ${{secrets.VM_IP }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run |
+          echo "$SSH_KEY" > key.pem
+        chmod 600 key.pem
+        scp -o StrictHostKeyChecking=no -i key.pem -r ./docker ubuntu@$VM_IP:~/app
+        ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$VM_IP << EOF
+          cd ~/app
+          docker build -t golang-helloworld .
+          docker stop golang-helloworld || true
+          docker rm golang-helloworld || true
+          docker run -d -p 8080:8080 golang-helloworld
+        EOF
 
       - name: Telegram notify
         if: always()
