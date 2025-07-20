@@ -11,24 +11,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
-
       - name: Run Linter
         run: go fmt ./...
-
       - name: Run Tests
         run: go test -v ./...
-
       - name: Build Go binary
         run: go build -v -o main .
-
       - name: Build Docker image
         run: docker build -t golang-helloworld:${{ github.sha }} .
-
       - name: Save artifact
         uses: actions/upload-artifact@v4
         with:
@@ -41,35 +35,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
-        - name: Deploy to Yandex Cloud VM
-  env:
-    VM_IP: ${{ secrets.VM_IP }}
-    SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-    SSH_KEY: ${{ secrets.SSH_KEY }}
-  run: |
-    echo "$SSH_KEY" > key.pem
-    chmod 600 key.pem
-    scp -o StrictHostKeyChecking=no -i key.pem -r ./docker ubuntu@$VM_IP:~/app
-    ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$VM_IP << EOF
-      cd ~/app
-      docker build -t golang-helloworld .
-      docker stop golang-helloworld || true
-      docker rm golang-helloworld || true
-      docker run -d -p 8080:8080 golang-helloworld
-    EOF
-
+      - name: Deploy to Yandex Cloud VM
+        env:
+          VM_IP: ${{ secrets.VM_IP }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          echo "$SSH_KEY" > key.pem
+          chmod 600 key.pem
+          scp -o StrictHostKeyChecking=no -i key.pem -r ./docker ubuntu@$VM_IP:~/app
+          ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$VM_IP << EOF
+            cd ~/app
+            docker build -t golang-helloworld .
+            docker stop golang-helloworld || true
+            docker rm golang-helloworld || true
+            docker run -d -p 8080:8080 golang-helloworld
+          EOF
       - name: Telegram notify
         if: always()
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: | 
-          if [ "${{ job.status }}" == "success" ]; then 
-            message=" CI завершён для ${GITHUB_REPOSITORY}\nСтатус deploy: ${{ job.status }}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            message="CI завершён для ${GITHUB_REPOSITORY}\nСтатус deploy: ${{ job.status }}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
           else
             message="CI завершился с ошибкой для ${GITHUB_REPOSITORY}\nСтатус deploy: ${{ job.status }}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
           fi
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
-            -d chat_id="${CHAT_ID}" \
-            -d text="$message"
+          -d chat_id="${CHAT_ID}" \
+          -d text="$message"
