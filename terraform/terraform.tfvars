@@ -1,0 +1,6 @@
+cloud_id        = "b1g0src4l2ssbkjsa3c4"
+folder_id       = "b1gb8so5eo29kfua60eo"
+oauth_token     = "y0__xDuy8bdAhjB3RMgrKCN8BNmLhr8zp51cCVGOHb9sI-HnzY0PQ"
+subnet_id       = "e9b91n6o2f9rkl9nib24"
+ssh_public_key_path = "/home/exid/.ssh/id_ed25519.pub"
+# service_account_key_file = "/path/to/key.json"
