@@ -36,7 +36,6 @@ resource "yandex_compute_instance" "vm-1" {
   }
 
   metadata = {
-    # Для Ubuntu-образов обычно имя пользователя — ubuntu.
-    ssh-keys = "ubuntu:${file(var.ssh_public_key)}"
+    ssh-keys = "ubuntu:${var.ssh_public_key}"
   }
 }
