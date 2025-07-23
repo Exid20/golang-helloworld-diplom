@@ -33,11 +33,30 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: build-test
     runs-on: ubuntu-latest
+    env: # Передай секреты для Terraform через переменные окружения
+      YC_TOKEN: ${{ secrets.YC_TOKEN }}
+      YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
+      YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+
     steps:
       - uses: actions/checkout@v3
-      - name: Deploy to Yandex Cloud VM
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+      - name: Get external IP from Terraform
+        id: tfoutput
+        run: echo "VM_IP=$(terraform output -raw external_ip_address_vm_1)" >> $GITHUB_ENV
+
+      # Деплой приложения на VM через SSH
+      - name: Deploy to Yandex Cloud VM (Deploy docker)
         env:
-          VM_IP: ${{ secrets.VM_IP }}
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
           SSH_KEY: ${{ secrets.SSH_KEY }}
         run: |
@@ -51,6 +70,7 @@ jobs:
             docker rm golang-helloworld || true
             docker run -d -p 8080:8080 golang-helloworld
           EOF
+
       - name: Telegram notify
         if: always()
         env:
@@ -62,6 +82,6 @@ jobs:
           else
             message="CI завершился с ошибкой для ${GITHUB_REPOSITORY}\nСтатус deploy: ${{ job.status }}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
           fi
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+          curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
           -d chat_id="${CHAT_ID}" \
           -d text="$message"
