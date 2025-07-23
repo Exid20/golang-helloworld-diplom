@@ -66,7 +66,7 @@ jobs:
         run: |
           echo "$SSH_KEY" > key.pem
           chmod 600 key.pem
-          scp -o StrictHostKeyChecking=no -i key.pem -r ./docker ubuntu@$VM_IP:~/app
+          scp -o StrictHostKeyChecking=no -i key.pem -r . $SSH_USERNAME@$VM_IP:~/app
           ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$VM_IP << EOF
             cd ~/app
             docker build -t golang-helloworld .
