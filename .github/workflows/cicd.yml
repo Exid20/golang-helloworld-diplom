@@ -57,8 +57,23 @@ jobs:
         working-directory: terraform
         id: tfoutput
         run: echo "VM_IP=$(terraform output -raw external_ip_address_vm_1)" >> $GITHUB_ENV
+        
+      - name: Wait for SSH
+        env:
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          VM_IP: ${{ env.VM_IP }}
+        run: |
+          echo "$SSH_KEY" > key.pem
+          chmod 600 key.pem
+          for i in {1..10}; do
+            if ssh -o StrictHostKeyChecking=no -i key.pem $SSH_USERNAME@$VM_IP 'echo SSH OK'; then
+           break
+          fi
+          sleep 10
+          done
 
-      # Деплой приложения на VM через SSH
+      
       - name: Deploy to Yandex Cloud VM (Deploy docker)
         env:
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
