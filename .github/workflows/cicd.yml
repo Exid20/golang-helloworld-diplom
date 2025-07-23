@@ -45,12 +45,15 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
+        working-directory: terraform
         run: terraform init
 
       - name: Terraform Apply
+        working-directory: terraform
         run: terraform apply -auto-approve
 
       - name: Get external IP from Terraform
+        working-directory: terraform
         id: tfoutput
         run: echo "VM_IP=$(terraform output -raw external_ip_address_vm_1)" >> $GITHUB_ENV
 
