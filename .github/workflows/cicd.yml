@@ -33,7 +33,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: build-test
     runs-on: ubuntu-latest
-    env: # Передай секреты для Terraform через переменные окружения
+    env:
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       YC_TOKEN: ${{ secrets.YC_TOKEN }}
       YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
@@ -82,13 +82,19 @@ jobs:
           echo "$SSH_KEY" > key.pem
           chmod 600 key.pem
           scp -o StrictHostKeyChecking=no -i key.pem -r . $SSH_USERNAME@$VM_IP:~/app
-          ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$VM_IP << EOF
+          ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$VM_IP << 'EOF'
+            if ! command -v docker &>/dev/null; then
+              echo "Docker не найден, устанавливаем..."
+              curl -fsSL https://get.docker.com | sudo sh
+              sudo usermod -aG docker $USER
+            fi
             cd ~/app
             docker build -t golang-helloworld .
             docker stop golang-helloworld || true
             docker rm golang-helloworld || true
             docker run -d -p 8080:8080 golang-helloworld
           EOF
+
 
       - name: Telegram notify
         if: always()
