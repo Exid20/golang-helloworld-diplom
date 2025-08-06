@@ -16,7 +16,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 func router() *mux.Router {
     r := mux.NewRouter()
     r.HandleFunc("/", handler)
-    r.Handle("/metrics", promhttp.Handler()) // <-- ОБЯЗАТЕЛЬНО
+    r.Handle("/metrics", promhttp.Handler())
     return r
 }
 
