@@ -2,14 +2,13 @@ version: '3.8'
 
 services:
   go-helloworld:
-    image: golang-helloworld-diplom:latest 
+    image: golang-helloworld-diplom:latest
     build:
       context: .
       dockerfile: Dockerfile
     container_name: go-helloworld
     ports:
       - "8080:8080"
-
 
   prometheus:
     image: prom/prometheus:latest
@@ -21,7 +20,7 @@ services:
     depends_on:
       - go-helloworld
 
-    grafana:
+  grafana:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
@@ -34,8 +33,10 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD_CHANGE=false
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
     volumes:
-     - ./dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
-     - ./node-exporter.json:/etc/grafana/provisioning/dashboards/node-exporter.json
-     - ./go-app.json:/etc/grafana/provisioning/dashboards/go-app.json
-     - ./prometheus-stats.json:/etc/grafana/provisioning/dashboards/prometheus-stats.json
+      - ./datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
+      - ./dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
+      - ./node-exporter.json:/etc/grafana/provisioning/dashboards/node-exporter.json
+      - ./go-app.json:/etc/grafana/provisioning/dashboards/go-app.json
+      - ./prometheus-stats.json:/etc/grafana/provisioning/dashboards/prometheus-stats.json
+
 
