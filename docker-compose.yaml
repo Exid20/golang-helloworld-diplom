@@ -16,7 +16,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/app/prometheus.yml:ro
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:
       - go-helloworld
 
