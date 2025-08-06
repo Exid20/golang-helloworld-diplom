@@ -11,18 +11,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
+
       - name: Run Linter
         run: go fmt ./...
+
       - name: Run Tests
         run: go test -v ./...
+
       - name: Build Go binary
         run: go build -v -o main .
+
       - name: Build Docker image
         run: docker build -t golang-helloworld:${{ github.sha }} .
+
       - name: Save artifact
         uses: actions/upload-artifact@v4
         with:
@@ -38,7 +44,6 @@ jobs:
       YC_TOKEN: ${{ secrets.YC_TOKEN }}
       YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
       YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
-      YC_VM_NAME: helloworld-vm
 
     steps:
       - uses: actions/checkout@v3
@@ -50,56 +55,35 @@ jobs:
         working-directory: terraform
         run: terraform init
 
-      - name: Check plan and import existing VM if needed
+      - name: Check and import existing VM
         working-directory: terraform
         env:
           YC_TOKEN: ${{ secrets.YC_TOKEN }}
           YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
-          YC_VM_NAME: ${{ env.YC_VM_NAME }}
         run: |
-          set -euo pipefail
-          # Установим jq для парсинга JSON ответа Yandex API
-          sudo apt-get update -y
-          sudo apt-get install -y jq curl
+          sudo apt-get update && sudo apt-get install -y jq curl
 
-          echo "Running terraform plan..."
-          # делаем план и сохраняем вывод
-          terraform plan -no-color -out=tfplan || true
-          PLAN_OUT=$(terraform show -no-color tfplan 2>/dev/null || true)
+          VM_NAME="helloworld-vm"
+          API_URL="https://compute.api.cloud.yandex.net/compute/v1/instances?folderId=${YC_FOLDER_ID}&filter=name%3D'${VM_NAME}'"
 
-          echo "Plan preview:"
-          echo "$PLAN_OUT" | sed -n '1,120p'
+          resp=$(curl -s -H "Authorization: Bearer ${YC_TOKEN}" "${API_URL}")
+          vm_id=$(echo "$resp" | jq -r '.instances[0].id // empty')
 
-          # Если в плане есть добавление (to add) — проверяем существует ли VM с именем YC_VM_NAME
-          if echo "$PLAN_OUT" | grep -E -q "Plan: .* to add"; then
-            echo "Terraform планирует создать ресурсы. Проверяем, существует ли VM '${YC_VM_NAME}' в Yandex Cloud..."
-            # Запрос к Yandex Compute API — ищем инстанс по имени в указанной папке
-            API_URL="https://compute.api.cloud.yandex.net/compute/v1/instances?folderId=${YC_FOLDER_ID}&filter=name%3D'${YC_VM_NAME}'"
-            resp=$(curl -s -H "Authorization: Bearer ${YC_TOKEN}" "${API_URL}")
-
-            # если есть хоть один элемент — возьмём его id
-            found_id=$(echo "$resp" | jq -r '.instances[0].id // empty')
-
-            if [ -n "$found_id" ]; then
-              echo "Найден существующий инстанс: id=${found_id}. Выполняем terraform import..."
-              # импортируем найденный ресурс (имя ресурса в tf — yandex_compute_instance.vm-1)
-              terraform import -input=false yandex_compute_instance.vm-1 "${found_id}"
-              echo "Импорт выполнен. Применяем terraform apply..."
-              terraform apply -auto-approve
-            else
-              echo "Инстанс '${YC_VM_NAME}' не найден — запускаем terraform apply (создание)."
-              terraform apply -auto-approve
-            fi
+          if [ -n "$vm_id" ]; then
+            echo "VM ${VM_NAME} существует в Yandex Cloud, id=${vm_id}"
+            terraform import -input=false yandex_compute_instance.vm-1 "$vm_id" || true
           else
-            echo "Terraform не планирует создание новых ресурсов (или план пуст). Выполняем terraform apply на всякий случай."
-            terraform apply -auto-approve
+            echo "VM ${VM_NAME} не найдена, будет создана новой."
           fi
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: terraform apply -auto-approve
 
       - name: Get external IP from Terraform
         working-directory: terraform
         id: tfoutput
-        run: |
-          echo "VM_IP=$(terraform output -raw external_ip_address_vm_1)" >> $GITHUB_ENV
+        run: echo "VM_IP=$(terraform output -raw external_ip_address_vm_1)" >> $GITHUB_ENV
 
       - name: Wait for SSH
         env:
@@ -121,28 +105,26 @@ jobs:
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
           SSH_KEY: ${{ secrets.SSH_KEY }}
         run: |
-         echo "$SSH_KEY" > key.pem
-         chmod 600 key.pem
-         scp -o StrictHostKeyChecking=no -i key.pem -r . $SSH_USERNAME@$VM_IP:~/app
-         ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$VM_IP << 'EOF'
-         if ! command -v docker &>/dev/null; then
-         echo "Docker не найден, устанавливаем..."
-         curl -fsSL https://get.docker.com | sudo sh
-         sudo usermod -aG docker $USER
-         fi
+          echo "$SSH_KEY" > key.pem
+          chmod 600 key.pem
+          scp -o StrictHostKeyChecking=no -i key.pem -r . $SSH_USERNAME@$VM_IP:~/app
+          ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$VM_IP << 'EOF'
+          if ! command -v docker &>/dev/null; then
+            echo "Docker не найден, устанавливаем..."
+            curl -fsSL https://get.docker.com | sudo sh
+            sudo usermod -aG docker $USER
+          fi
 
-         if ! command -v docker compose &>/dev/null; then
-         echo "Docker Compose не найден, устанавливаем..."
-         sudo apt-get update
-         sudo apt-get install -y docker-compose-plugin
-         fi
+          if ! command -v docker compose &>/dev/null; then
+            echo "Docker Compose не найден, устанавливаем..."
+            sudo apt-get update
+            sudo apt-get install -y docker-compose-plugin
+          fi
 
-         cd ~/app
-
-         sudo docker compose down || true
-
-         sudo docker compose up --build -d
-         EOF
+          cd ~/app
+          sudo docker compose down || true
+          sudo docker compose up --build -d
+          EOF
 
       - name: Telegram notify
         if: always()
@@ -151,11 +133,12 @@ jobs:
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            message="CI завершён для ${GITHUB_REPOSITORY}\nСтатус deploy: ${{ job.status }}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
+            message="✅ CI завершён успешно\nРепозиторий: ${GITHUB_REPOSITORY}\nВетка: ${GITHUB_REF}\nКоммит: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
           else
-            message="CI завершился с ошибкой для ${GITHUB_REPOSITORY}\nСтатус deploy: ${{ job.status }}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
+            message="❌ CI завершился с ошибкой\nРепозиторий: ${GITHUB_REPOSITORY}\nВетка: ${GITHUB_REF}\nКоммит: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
           fi
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
-          -d chat_id="${CHAT_ID}" \
-          -d text="$message"
+            -d chat_id="${CHAT_ID}" \
+            -d text="$message"
+
 
