@@ -33,10 +33,10 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD_CHANGE=false
       - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
     volumes:
-      - ./datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
-      - ./dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
-      - ./node-exporter.json:/etc/grafana/provisioning/dashboards/node-exporter.json
-      - ./go-app.json:/etc/grafana/provisioning/dashboards/go-app.json
-      - ./prometheus-stats.json:/etc/grafana/provisioning/dashboards/prometheus-stats.json
+      - ./datasources.yml:/etc/grafana/provisioning/datasources
+      - ./dashboards.yml:/etc/grafana/provisioning/dashboards
+      - ./node-exporter.json:/etc/grafana/provisioning/dashboards
+      - ./go-app.json:/etc/grafana/provisioning/dashboards
+      - ./prometheus-stats.json:/etc/grafana/provisioning/dashboards
 
 
