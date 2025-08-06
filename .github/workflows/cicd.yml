@@ -70,7 +70,7 @@ jobs:
             if ssh -o StrictHostKeyChecking=no -i key.pem $SSH_USERNAME@$VM_IP 'echo SSH OK'; then
            break
           fi
-          sleep 10
+          sleep 2
           done
 
       - name: Deploy to Yandex Cloud VM (Deploy docker compose)

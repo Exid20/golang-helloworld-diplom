@@ -16,7 +16,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus.yml:/app/prometheus.yml:ro
     depends_on:
       - go-helloworld
 
@@ -28,15 +28,13 @@ services:
     depends_on:
       - prometheus
     environment:
+      - GF_SECURITY_ADMIN_PASSWORD_CHANGE=false
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_SECURITY_ADMIN_PASSWORD_CHANGE=false
-      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_PATHS_PROVISIONING=/app/provisioning
     volumes:
-      - ./datasources.yml:/etc/grafana/provisioning/datasources
-      - ./dashboards.yml:/etc/grafana/provisioning/dashboards
-      - ./node-exporter.json:/etc/grafana/provisioning/dashboards
-      - ./go-app.json:/etc/grafana/provisioning/dashboards
-      - ./prometheus-stats.json:/etc/grafana/provisioning/dashboards
+      - ./provisioning/datasources:/app/provisioning/datasources
+      - ./provisioning/dashboards:/app/provisioning/dashboards
+
 
 
