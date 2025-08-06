@@ -38,6 +38,7 @@ jobs:
       YC_TOKEN: ${{ secrets.YC_TOKEN }}
       YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
       YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+      YC_VM_NAME: helloworld-vm
 
     steps:
       - uses: actions/checkout@v3
@@ -49,15 +50,57 @@ jobs:
         working-directory: terraform
         run: terraform init
 
-      - name: Terraform Apply
+      - name: Check plan and import existing VM if needed
         working-directory: terraform
-        run: terraform apply -auto-approve
+        env:
+          YC_TOKEN: ${{ secrets.YC_TOKEN }}
+          YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+          YC_VM_NAME: ${{ env.YC_VM_NAME }}
+        run: |
+          set -euo pipefail
+          # Установим jq для парсинга JSON ответа Yandex API
+          sudo apt-get update -y
+          sudo apt-get install -y jq curl
+
+          echo "Running terraform plan..."
+          # делаем план и сохраняем вывод
+          terraform plan -no-color -out=tfplan || true
+          PLAN_OUT=$(terraform show -no-color tfplan 2>/dev/null || true)
+
+          echo "Plan preview:"
+          echo "$PLAN_OUT" | sed -n '1,120p'
+
+          # Если в плане есть добавление (to add) — проверяем существует ли VM с именем YC_VM_NAME
+          if echo "$PLAN_OUT" | grep -E -q "Plan: .* to add"; then
+            echo "Terraform планирует создать ресурсы. Проверяем, существует ли VM '${YC_VM_NAME}' в Yandex Cloud..."
+            # Запрос к Yandex Compute API — ищем инстанс по имени в указанной папке
+            API_URL="https://compute.api.cloud.yandex.net/compute/v1/instances?folderId=${YC_FOLDER_ID}&filter=name%3D'${YC_VM_NAME}'"
+            resp=$(curl -s -H "Authorization: Bearer ${YC_TOKEN}" "${API_URL}")
+
+            # если есть хоть один элемент — возьмём его id
+            found_id=$(echo "$resp" | jq -r '.instances[0].id // empty')
+
+            if [ -n "$found_id" ]; then
+              echo "Найден существующий инстанс: id=${found_id}. Выполняем terraform import..."
+              # импортируем найденный ресурс (имя ресурса в tf — yandex_compute_instance.vm-1)
+              terraform import -input=false yandex_compute_instance.vm-1 "${found_id}"
+              echo "Импорт выполнен. Применяем terraform apply..."
+              terraform apply -auto-approve
+            else
+              echo "Инстанс '${YC_VM_NAME}' не найден — запускаем terraform apply (создание)."
+              terraform apply -auto-approve
+            fi
+          else
+            echo "Terraform не планирует создание новых ресурсов (или план пуст). Выполняем terraform apply на всякий случай."
+            terraform apply -auto-approve
+          fi
 
       - name: Get external IP from Terraform
         working-directory: terraform
         id: tfoutput
-        run: echo "VM_IP=$(terraform output -raw external_ip_address_vm_1)" >> $GITHUB_ENV
-        
+        run: |
+          echo "VM_IP=$(terraform output -raw external_ip_address_vm_1)" >> $GITHUB_ENV
+
       - name: Wait for SSH
         env:
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
@@ -68,9 +111,9 @@ jobs:
           chmod 600 key.pem
           for i in {1..10}; do
             if ssh -o StrictHostKeyChecking=no -i key.pem $SSH_USERNAME@$VM_IP 'echo SSH OK'; then
-           break
-          fi
-          sleep 2
+              break
+            fi
+            sleep 2
           done
 
       - name: Deploy to Yandex Cloud VM (Deploy docker compose)
@@ -101,7 +144,6 @@ jobs:
          sudo docker compose up --build -d
          EOF
 
-
       - name: Telegram notify
         if: always()
         env:
@@ -116,3 +158,4 @@ jobs:
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
           -d chat_id="${CHAT_ID}" \
           -d text="$message"
+
