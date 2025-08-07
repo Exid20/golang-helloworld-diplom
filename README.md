@@ -8,12 +8,19 @@
 
 
 ##Technologies
+
 Go
+
 Docker
+
 Оркестрация через docker-compose
+
 terraform
+
 yandex cloud
+
 Github action CI/CD
+
 Prometheus + Grafana
 
 ##Project Structure
