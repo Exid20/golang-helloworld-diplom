@@ -9,6 +9,7 @@ services:
     container_name: go-helloworld
     ports:
       - "8080:8080"
+    restart: unless-stopped 
 
   prometheus:
     image: prom/prometheus:latest
@@ -19,6 +20,7 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     depends_on:
       - go-helloworld
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:latest
@@ -35,6 +37,7 @@ services:
     volumes:
       - ./provisioning/datasources:/app/provisioning/datasources
       - ./provisioning/dashboards:/app/provisioning/dashboards
+    restart: unless-stopped
 
 
 
