@@ -10,7 +10,9 @@ import (
 )
 
 func handler(w http.ResponseWriter, r *http.Request) {
-    io.WriteString(w, "Hello, world!\n")
+    if _, err := io.WriteString(w, "Hello, world!\n"); err != nil {
+        log.Printf("write error: %v", err)
+    }
 }
 
 func router() *mux.Router {
