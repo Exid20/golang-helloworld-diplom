@@ -1,33 +1,41 @@
----
 name: CI/CD
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.21'
-      - name: Run Linter
-        run: go fmt ./...
-      - name: Run Tests
-        run: go test -v ./...
-      - name: Build Go binary
-        run: go build -v -o main .
+
+      - name: Run GolangCI-Lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.55.2
+
+      - name: Run Tests with Coverage
+        run: go test -v -cover ./...
+
       - name: Build Docker image
         run: docker build -t golang-helloworld:${{ github.sha }} .
-      - name: Save artifact
+
+      - name: Save Docker Image as Artifact (optional)
+        run: docker save golang-helloworld:${{ github.sha }} | gzip > golang-helloworld.tar.gz
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: golang-helloworld
-          path: main
+          path: golang-helloworld.tar.gz
 
   deploy:
     if: github.ref == 'refs/heads/main'
@@ -45,6 +53,14 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Terraform Format Check
+        working-directory: terraform
+        run: terraform fmt -check
+
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
       - name: Terraform Init
         working-directory: terraform
         run: terraform init
@@ -57,7 +73,7 @@ jobs:
         working-directory: terraform
         id: tfoutput
         run: echo "VM_IP=$(terraform output -raw external_ip_address_vm_1)" >> $GITHUB_ENV
-        
+
       - name: Wait for SSH
         env:
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
@@ -68,39 +84,37 @@ jobs:
           chmod 600 key.pem
           for i in {1..10}; do
             if ssh -o StrictHostKeyChecking=no -i key.pem $SSH_USERNAME@$VM_IP 'echo SSH OK'; then
-           break
-          fi
-          sleep 2
+              break
+            fi
+            sleep 2
           done
 
-      - name: Deploy to Yandex Cloud VM (Deploy docker compose)
+      - name: Deploy to Yandex Cloud VM (docker compose)
         env:
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
           SSH_KEY: ${{ secrets.SSH_KEY }}
+          VM_IP: ${{ env.VM_IP }}
         run: |
-         echo "$SSH_KEY" > key.pem
-         chmod 600 key.pem
-         scp -o StrictHostKeyChecking=no -i key.pem -r . $SSH_USERNAME@$VM_IP:~/app
-         ssh -o StrictHostKeyChecking=no -i key.pem ubuntu@$VM_IP << 'EOF'
-         if ! command -v docker &>/dev/null; then
-         echo "Docker не найден, устанавливаем..."
-         curl -fsSL https://get.docker.com | sudo sh
-         sudo usermod -aG docker $USER
-         fi
+          echo "$SSH_KEY" > key.pem
+          chmod 600 key.pem
+          scp -o StrictHostKeyChecking=no -i key.pem -r . $SSH_USERNAME@$VM_IP:~/app
+          ssh -o StrictHostKeyChecking=no -i key.pem $SSH_USERNAME@$VM_IP << 'EOF'
+            if ! command -v docker &>/dev/null; then
+              echo "Docker не найден, устанавливаем..."
+              curl -fsSL https://get.docker.com | sudo sh
+              sudo usermod -aG docker $USER
+            fi
 
-         if ! command -v docker compose &>/dev/null; then
-         echo "Docker Compose не найден, устанавливаем..."
-         sudo apt-get update
-         sudo apt-get install -y docker-compose-plugin
-         fi
+            if ! command -v docker compose &>/dev/null; then
+              echo "Docker Compose не найден, устанавливаем..."
+              sudo apt-get update
+              sudo apt-get install -y docker-compose-plugin
+            fi
 
-         cd ~/app
-
-         sudo docker compose down || true
-
-         sudo docker compose up --build -d
-         EOF
-
+            cd ~/app
+            sudo docker compose down || true
+            sudo docker compose up --build -d
+          EOF
 
       - name: Telegram notify
         if: always()
@@ -109,10 +123,11 @@ jobs:
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            message="CI завершён для ${GITHUB_REPOSITORY}\nСтатус deploy: ${{ job.status }}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
+            message="✅ CI/CD завершён успешно для ${GITHUB_REPOSITORY}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}"
           else
-            message="CI завершился с ошибкой для ${GITHUB_REPOSITORY}\nСтатус deploy: ${{ job.status }}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}\nВремя: $(date '+%Y-%m-%d %H:%M:%S')"
+            message="❌ Ошибка в CI/CD для ${GITHUB_REPOSITORY}\nВетка: ${GITHUB_REF}\nCommit: ${GITHUB_SHA}"
           fi
+
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
           -d chat_id="${CHAT_ID}" \
           -d text="$message"
